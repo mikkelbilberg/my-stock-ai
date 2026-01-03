@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
-import google.generativeai as genai
+import requests # <--- New way: We talk directly to the web
+import json
 import plotly.express as px
 import pandas as pd
 
@@ -14,8 +15,8 @@ except:
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
 # --- SETUP PAGE ---
-st.set_page_config(page_title="Gemini 3.6 Ultimate Restore", layout="wide")
-st.title("🚀 Gemini 3.6 Ultimate TradeStation")
+st.set_page_config(page_title="Gemini 4.0 Manual Mode", layout="wide")
+st.title("🚀 Gemini 4.0 TradeStation (Direct Link)")
 
 # --- FUNCTIONS ---
 def get_safe_data(ticker):
@@ -36,26 +37,33 @@ def get_chart_data(ticker):
 
 def get_gemini_response(prompt):
     """
-    THE SAFETY SWITCH:
-    1. Tries the new fast model (Flash).
-    2. If that fails (404 error), automatically switches to the standard model (Pro).
+    NEW METHOD: DIRECT HTTP REQUEST
+    This bypasses the 'google-generativeai' library completely.
+    It manually sends the data to Google's API URL.
     """
-    genai.configure(api_key=API_KEY)
+    # 1. The Direct URL (Using gemini-1.5-flash)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     
-    # List of models to try in order
-    backup_models = ["gemini-1.5-flash", "gemini-pro"]
+    # 2. The Data Package
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
     
-    last_error = ""
-    
-    for model_name in backup_models:
-        try:
-            model = genai.GenerativeModel(model_name)
-            return model.generate_content(prompt).text
-        except Exception as e:
-            last_error = str(e)
-            continue # Try the next model
+    # 3. Send the Signal
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+        
+        # Check if it worked (Code 200 = OK)
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"Error {response.status_code}: {response.text}"
             
-    return f"AI Error: All models failed. Last error: {last_error}"
+    except Exception as e:
+        return f"Connection Error: {str(e)}"
 
 # --- SECTION 1: MARKET SCANNER ---
 st.header("1. 📡 Live Market Scanner")
@@ -128,7 +136,7 @@ if st.button("Run Analysis"):
     with st.spinner("Thinking..."):
         st.markdown(get_gemini_response(full_prompt))
 
-# --- SECTION 4: PORTFOLIO BUILDER (FULL VERSION RESTORED) ---
+# --- SECTION 4: PORTFOLIO BUILDER (ALL 5 LEVELS) ---
 st.divider()
 st.header("4. 💰 Strategy Builder")
 st.error("⚠️ DISCLAIMER: This is for educational purposes only. NOT financial advice.")
@@ -137,13 +145,11 @@ col1, col2 = st.columns([1, 2])
 
 with col1:
     investment = st.number_input("Investment Amount ($)", min_value=100, value=1000, step=100)
-    # ALL 5 OPTIONS RESTORED HERE
     risk_level = st.radio("Select Risk Tolerance", 
                           ["Very Low", "Low", "Moderate", "High", "Very High"])
     
     generate_btn = st.button("Generate Strategy")
 
-# FULL RISK MAP RESTORED
 risk_map = {
     "Very Low": {"Bonds": 70, "Cash": 20, "Index Funds": 10, "Stocks": 0, "Crypto": 0},
     "Low": {"Bonds": 50, "Index Funds": 30, "Cash": 10, "Stocks": 10, "Crypto": 0},
@@ -164,7 +170,7 @@ with col2:
                      color_discrete_sequence=px.colors.sequential.RdBu)
         st.plotly_chart(fig, use_container_width=True)
         
-        # 2. Get AI Advice
+        # 2. Get AI Advice (Using Direct Link)
         st.subheader("📋 Detailed Buying Guide")
         
         ai_prompt = f"""
