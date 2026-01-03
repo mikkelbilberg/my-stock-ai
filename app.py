@@ -12,13 +12,15 @@ except:
     st.error("⚠️ API Key not found. Please set it in Streamlit Secrets.")
     st.stop()
 
-MODEL_NAME = "gemini-1.5-flash" 
+# LISTE OVER MODELLER (Backup system)
+# Den prøver dem en efter en, indtil en virker.
+MODELS_TO_TRY = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-001", "gemini-pro"]
 
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
 # --- SETUP PAGE ---
-st.set_page_config(page_title="Gemini 3.1 Ultimate", layout="wide")
-st.title("🚀 Gemini 3.1 Ultimate TradeStation")
+st.set_page_config(page_title="Gemini 3.2 Bulletproof", layout="wide")
+st.title("🛡️ Gemini 3.2 Bulletproof TradeStation")
 
 # --- FUNCTIONS ---
 def get_safe_data(ticker):
@@ -38,12 +40,21 @@ def get_chart_data(ticker):
     return hist
 
 def get_gemini_response(prompt):
+    """Smart function that tries multiple models if one fails."""
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel(MODEL_NAME)
-    try:
-        return model.generate_content(prompt).text
-    except Exception as e:
-        return f"AI Error: {e}"
+    
+    last_error = ""
+    for model_name in MODELS_TO_TRY:
+        try:
+            model = genai.GenerativeModel(model_name)
+            return model.generate_content(prompt).text
+        except Exception as e:
+            # Hvis den fejler, gem fejlen og prøv næste model i listen
+            last_error = str(e)
+            continue
+            
+    # Hvis ALLE modeller fejler:
+    return f"AI Error: Kunne ikke forbinde til nogen modeller. Sidste fejl: {last_error}"
 
 # --- SECTION 1: MARKET SCANNER ---
 st.header("1. 📡 Live Market Scanner")
@@ -167,4 +178,3 @@ with col2:
         with st.spinner("Calculating optimal assets..."):
             advice = get_gemini_response(ai_prompt)
             st.markdown(advice)
-
