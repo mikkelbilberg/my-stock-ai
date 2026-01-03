@@ -17,8 +17,8 @@ MODEL_NAME = "gemini-2.5-flash"
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
 # --- SETUP PAGE ---
-st.set_page_config(page_title="Gemini 3.0 Ultimate", layout="wide")
-st.title("🚀 Gemini 3.0 Ultimate TradeStation")
+st.set_page_config(page_title="Gemini 3.1 Ultimate", layout="wide")
+st.title("🚀 Gemini 3.1 Ultimate TradeStation")
 
 # --- FUNCTIONS ---
 def get_safe_data(ticker):
@@ -45,7 +45,7 @@ def get_gemini_response(prompt):
     except Exception as e:
         return f"AI Error: {e}"
 
-# --- MAIN DASHBOARD (SECTION 1) ---
+# --- SECTION 1: MARKET SCANNER ---
 st.header("1. 📡 Live Market Scanner")
 
 if st.button("🔄 Scan Markets Now", type="primary"):
@@ -67,36 +67,22 @@ if st.button("🔄 Scan Markets Now", type="primary"):
         st.success("Scan Complete")
         st.markdown(get_gemini_response(prompt))
 
-# --- CHARTING SECTION (NEW! LIKE GOOGLE) ---
+# --- SECTION 2: INTERACTIVE CHARTS ---
 st.divider()
 st.header("2. 📊 Interactive Price Charts")
 
-# Dropdown to pick a stock
 selected_ticker = st.selectbox("Select a Stock to View Chart:", WATCHLIST)
 
 if selected_ticker:
     try:
-        # Get data
         chart_data = get_chart_data(selected_ticker)
-        
-        # Create the interactive chart (Like Google)
         fig = px.line(chart_data, y='Close', title=f"{selected_ticker} - 30 Day Price Trend")
-        
-        # Make it look cool (Dark mode friendly)
         fig.update_layout(xaxis_title="Date", yaxis_title="Price ($)")
-        
-        # Show it
         st.plotly_chart(fig, use_container_width=True)
-        
-        # Quick AI Comment on the chart
-        if st.button(f"Analyze {selected_ticker} Chart"):
-            trend_prompt = f"Analyze the trend for {selected_ticker}. The price moved from ${chart_data['Close'].iloc[0]:.2f} to ${chart_data['Close'].iloc[-1]:.2f} over 30 days. Is it Bullish or Bearish?"
-            st.write(get_gemini_response(trend_prompt))
-            
     except Exception as e:
         st.error(f"Could not load chart: {e}")
 
-# --- CHAT SECTION (SECTION 3 - FIXED BUTTONS) ---
+# --- SECTION 3: CHAT ANALYST ---
 st.divider()
 st.header("3. 💬 Ask the Analyst")
 
@@ -107,7 +93,6 @@ with col_chat1:
 
 with col_chat2:
     st.write("Response Style:")
-    # Replaced 'st.pills' with 'st.radio' to GUARANTEE it shows up
     response_style = st.radio("Style", ["Short & Direct", "Detailed Analysis"])
 
 if st.button("Run Analysis"):
@@ -131,11 +116,26 @@ if st.button("Run Analysis"):
     with st.spinner("Thinking..."):
         st.markdown(get_gemini_response(full_prompt))
 
-# --- PORTFOLIO (SECTION 4) ---
+# --- SECTION 4: PORTFOLIO BUILDER (RESTORED!) ---
 st.divider()
 st.header("4. 💰 Strategy Builder")
-# (Keeping this simple for now)
-st.info("Portfolio Builder is ready below (Code hidden to save space)")
-# ... (You can keep the portfolio code here if you want, but the file is getting long!)
+st.error("⚠️ DISCLAIMER: This is for educational purposes only. NOT financial advice.")
 
+col1, col2 = st.columns([1, 2])
 
+with col1:
+    investment = st.number_input("Investment Amount ($)", min_value=100, value=1000, step=100)
+    risk_level = st.radio("Select Risk Tolerance", 
+                          ["Very Low", "Low", "Moderate", "High", "Very High"])
+    
+    generate_btn = st.button("Generate Strategy")
+
+risk_map = {
+    "Very Low": {"Bonds": 70, "Cash": 20, "Index Funds": 10, "Stocks": 0, "Crypto": 0},
+    "Low": {"Bonds": 50, "Index Funds": 30, "Cash": 10, "Stocks": 10, "Crypto": 0},
+    "Moderate": {"Index Funds": 40, "Stocks": 30, "Bonds": 20, "Crypto": 5, "Cash": 5},
+    "High": {"Stocks": 50, "Crypto": 30, "Index Funds": 10, "Bonds": 0, "Tech ETFs": 10},
+    "Very High": {"Crypto": 60, "Tech Options": 20, "Stocks": 20, "Bonds": 0, "Cash": 0}
+}
+
+with col2:
