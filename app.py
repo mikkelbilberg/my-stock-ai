@@ -3,7 +3,6 @@ import yfinance as yf
 import google.generativeai as genai
 import plotly.express as px
 import pandas as pd
-import time
 
 # --- CONFIGURATION ---
 try:
@@ -12,15 +11,11 @@ except:
     st.error("⚠️ API Key not found. Please set it in Streamlit Secrets.")
     st.stop()
 
-# BACKUP MODEL LIST
-# The app will try these one by one until it finds one that works.
-MODELS_TO_TRY = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]
-
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
 # --- SETUP PAGE ---
-st.set_page_config(page_title="Gemini 3.5 Full Restore", layout="wide")
-st.title("🚀 Gemini 3.5 Full TradeStation")
+st.set_page_config(page_title="Gemini 3.6 Ultimate Restore", layout="wide")
+st.title("🚀 Gemini 3.6 Ultimate TradeStation")
 
 # --- FUNCTIONS ---
 def get_safe_data(ticker):
@@ -40,20 +35,27 @@ def get_chart_data(ticker):
     return hist
 
 def get_gemini_response(prompt):
-    """Smart function that tries multiple models if one fails."""
+    """
+    THE SAFETY SWITCH:
+    1. Tries the new fast model (Flash).
+    2. If that fails (404 error), automatically switches to the standard model (Pro).
+    """
     genai.configure(api_key=API_KEY)
     
+    # List of models to try in order
+    backup_models = ["gemini-1.5-flash", "gemini-pro"]
+    
     last_error = ""
-    # Try each model in the list
-    for model_name in MODELS_TO_TRY:
+    
+    for model_name in backup_models:
         try:
             model = genai.GenerativeModel(model_name)
             return model.generate_content(prompt).text
         except Exception as e:
             last_error = str(e)
-            continue
+            continue # Try the next model
             
-    return f"AI Error: Could not connect to any model. Please update requirements.txt. Last error: {last_error}"
+    return f"AI Error: All models failed. Last error: {last_error}"
 
 # --- SECTION 1: MARKET SCANNER ---
 st.header("1. 📡 Live Market Scanner")
@@ -126,7 +128,7 @@ if st.button("Run Analysis"):
     with st.spinner("Thinking..."):
         st.markdown(get_gemini_response(full_prompt))
 
-# --- SECTION 4: PORTFOLIO BUILDER (FULL VERSION) ---
+# --- SECTION 4: PORTFOLIO BUILDER (FULL VERSION RESTORED) ---
 st.divider()
 st.header("4. 💰 Strategy Builder")
 st.error("⚠️ DISCLAIMER: This is for educational purposes only. NOT financial advice.")
@@ -135,6 +137,7 @@ col1, col2 = st.columns([1, 2])
 
 with col1:
     investment = st.number_input("Investment Amount ($)", min_value=100, value=1000, step=100)
+    # ALL 5 OPTIONS RESTORED HERE
     risk_level = st.radio("Select Risk Tolerance", 
                           ["Very Low", "Low", "Moderate", "High", "Very High"])
     
