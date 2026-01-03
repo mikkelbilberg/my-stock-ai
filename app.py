@@ -4,6 +4,7 @@ import requests
 import json
 import plotly.express as px
 import pandas as pd
+import time
 
 # --- CONFIGURATION ---
 try:
@@ -15,45 +16,51 @@ except:
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
 # --- SETUP PAGE ---
-st.set_page_config(page_title="Gemini 5.0 Auto-Detect", layout="wide")
-st.title("🚀 Gemini 5.0 TradeStation (Auto-Detect Mode)")
+st.set_page_config(page_title="Gemini 5.1 Rotator", layout="wide")
+st.title("🚀 Gemini 5.1 TradeStation (Quota Safe Mode)")
 
 # --- FUNCTIONS ---
 
-def get_valid_model():
+def get_gemini_response(prompt):
     """
-    AUTO-DISCOVERY SYSTEM
-    Instead of guessing 'gemini-1.5-flash', we ask Google what is allowed.
+    THE ROTATOR:
+    Tries multiple models in order. 
+    If one gives '429 Quota Exceeded' or '404 Not Found', it moves to the next.
     """
-    if 'valid_model' in st.session_state:
-        return st.session_state['valid_model']
+    # Priority list: Newest -> Fastest -> Oldest (Reliable)
+    models_to_try = [
+        "gemini-2.0-flash-exp", 
+        "gemini-1.5-flash", 
+        "gemini-1.5-flash-8b",
+        "gemini-1.5-pro",
+        "gemini-1.0-pro"
+    ]
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            # Loop through all available models
-            for model in data.get('models', []):
-                # We need a model that supports 'generateContent'
-                if "generateContent" in model.get('supportedGenerationMethods', []):
-                    # Prefer the 'flash' model if available (it's faster)
-                    if "flash" in model['name']:
-                        model_name = model['name'].replace("models/", "")
-                        st.session_state['valid_model'] = model_name
-                        return model_name
+    headers = {'Content-Type': 'application/json'}
+    data = {"contents": [{"parts": [{"text": prompt}]}]}
+    
+    last_error = ""
+    
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={API_KEY}"
+        try:
+            # Send Request
+            response = requests.post(url, headers=headers, data=json.dumps(data))
             
-            # If no Flash, just grab the first valid text model found
-            for model in data.get('models', []):
-                if "generateContent" in model.get('supportedGenerationMethods', []):
-                    model_name = model['name'].replace("models/", "")
-                    st.session_state['valid_model'] = model_name
-                    return model_name
-                    
-    except Exception as e:
-        return None
-    
-    return "gemini-1.5-flash" # Fallback guess if auto-detect fails totally
+            # 200 = Success
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            
+            # If 429 (Quota Full) or 404 (Not Found), we just continue to the next model
+            else:
+                last_error = f"Model {model} Error: {response.status_code}"
+                continue 
+                
+        except Exception as e:
+            last_error = str(e)
+            continue
+            
+    return f"AI System Overload: All models are busy or quota exceeded. Please wait 1 minute. ({last_error})"
 
 def get_safe_data(ticker):
     try:
@@ -68,28 +75,6 @@ def get_chart_data(ticker):
     stock = yf.Ticker(ticker)
     hist = stock.history(period="1mo")
     return hist
-
-def get_gemini_response(prompt):
-    # 1. Auto-Detect the correct model name for YOUR region
-    model_name = get_valid_model()
-    
-    if not model_name:
-        return "System Error: Could not verify your API Key. Please check it in Secrets."
-
-    # 2. Send the request
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
-    headers = {'Content-Type': 'application/json'}
-    data = {"contents": [{"parts": [{"text": prompt}]}]}
-    
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"Error using model '{model_name}': {response.text}"
-            
-    except Exception as e:
-        return f"Connection Error: {str(e)}"
 
 # --- SECTION 1: MARKET SCANNER ---
 st.header("1. 📡 Live Market Scanner")
@@ -141,7 +126,7 @@ if st.button("Run Analysis"):
     with st.spinner("Thinking..."):
         st.markdown(get_gemini_response(full_prompt))
 
-# --- SECTION 4: PORTFOLIO BUILDER (ALL 5 LEVELS) ---
+# --- SECTION 4: PORTFOLIO BUILDER ---
 st.divider()
 st.header("4. 💰 Strategy Builder")
 st.error("⚠️ DISCLAIMER: Educational purposes only.")
@@ -169,5 +154,5 @@ with col2:
         
         st.subheader("📋 Detailed Buying Guide")
         ai_prompt = f"Advisor role. Budget: ${investment}. Risk: {risk_level}. Allocation: {allocations}. Give specific ticker recommendations."
-        with st.spinner("Calculating..."):
+        with st.spinner("Finding a free AI model..."):
             st.markdown(get_gemini_response(ai_prompt))
