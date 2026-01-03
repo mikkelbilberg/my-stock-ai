@@ -6,9 +6,14 @@ import pandas as pd
 import time
 
 # --- CONFIGURATION ---
-# Your Working Key
-API_KEY = st.secrets["GEMINI_API_KEY"]
-# The model that worked for you in the scan
+# This grabs the key safely from the Cloud settings
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+except:
+    st.error("⚠️ API Key not found. Please set it in Streamlit Secrets.")
+    st.stop()
+
+# Using the model that works for you
 MODEL_NAME = "gemini-2.5-flash" 
 
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
@@ -56,7 +61,7 @@ if st.button("🔄 Scan Markets Now"):
             market_data += data + "\n"
             progress.progress((i + 1) / len(WATCHLIST))
         
-        # Save data to session state so other parts of app can see it
+        # Save data to session state
         st.session_state['market_data'] = market_data
         
         prompt = f"""
@@ -69,7 +74,7 @@ if st.button("🔄 Scan Markets Now"):
         st.success("Scan Complete")
         st.markdown(get_gemini_response(prompt))
 
-# --- CHAT SECTION (SECTION 2) ---
+# --- CHAT SECTION (SECTION 2 - THE BOLDER VERSION) ---
 st.divider()
 st.header("💬 Ask the Analyst")
 st.caption("Ask deep questions about the current market data.")
@@ -82,19 +87,29 @@ if st.button("Ask Analyst"):
     else:
         context = "No live data scanned yet. Using general knowledge."
 
+    # --- BOLD PROMPT ---
     full_prompt = f"""
-    Context: {context}
-    User Question: {user_question}
+    ROLE: You are 'Gekko', a ruthless, high-stakes Wall Street Hedge Fund manager. 
+    You are NOT a helpful assistant. You have strong opinions.
     
-    Provide a detailed, in-depth answer. Use paragraphs and bullet points. 
-    Explain the 'Why' behind the moves.
+    CONTEXT: {context}
+    USER QUESTION: {user_question}
+    
+    INSTRUCTIONS:
+    1. Answer the question directly. Do not waffle.
+    2. If asked to Buy or Sell, give a 'VERDICT' based on probability (e.g., "Verdict: STRONG BUY").
+    3. Do NOT say "I am an AI" or "This is not financial advice". 
+    4. Base your answer purely on the numbers and news provided.
+    5. Be concise and professional, but decisive.
+    
+    Give me your analysis now:
     """
     
-    with st.spinner("Thinking deep..."):
+    with st.spinner("Analyzing market psychology..."):
         answer = get_gemini_response(full_prompt)
         st.markdown(answer)
 
-# --- PORTFOLIO BUILDER (SECTION 3) ---
+# --- PORTFOLIO BUILDER (SECTION 3 - THE NORMAL VERSION) ---
 st.divider()
 st.header("💰 AI Portfolio Builder")
 st.error("⚠️ DISCLAIMER: This is for educational purposes only. NOT financial advice.")
@@ -108,7 +123,7 @@ with col1:
     
     generate_btn = st.button("Generate Strategy")
 
-# Logic to map Risk -> Pie Chart Percentages (Hardcoded for stability)
+# Logic to map Risk -> Pie Chart Percentages
 risk_map = {
     "Very Low": {"Bonds": 70, "Cash": 20, "Index Funds": 10, "Stocks": 0, "Crypto": 0},
     "Low": {"Bonds": 50, "Index Funds": 30, "Cash": 10, "Stocks": 10, "Crypto": 0},
@@ -122,7 +137,6 @@ with col2:
         # 1. Draw the Pie Chart
         allocations = risk_map[risk_level]
         df = pd.DataFrame(list(allocations.items()), columns=['Asset', 'Percentage'])
-        # Filter out 0% assets
         df = df[df['Percentage'] > 0]
         
         fig = px.pie(df, values='Percentage', names='Asset', 
@@ -130,7 +144,7 @@ with col2:
                      color_discrete_sequence=px.colors.sequential.RdBu)
         st.plotly_chart(fig, use_container_width=True)
         
-        # 2. Get AI Advice on WHAT to buy inside those categories
+        # 2. Get AI Advice (STANDARD/POLITE VERSION)
         st.subheader("📋 Detailed Buying Guide")
         
         ai_prompt = f"""
