@@ -12,7 +12,7 @@ except:
     st.error("⚠️ API Key not found. Please set it in Streamlit Secrets.")
     st.stop()
 
-MODEL_NAME = "gemini-2.5-flash" 
+MODEL_NAME = "gemini-1.5-flash" 
 
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
@@ -167,3 +167,4 @@ with col2:
         with st.spinner("Calculating optimal assets..."):
             advice = get_gemini_response(ai_prompt)
             st.markdown(advice)
+
