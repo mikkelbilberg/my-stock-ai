@@ -3,7 +3,6 @@ import yfinance as yf
 import google.generativeai as genai
 import plotly.express as px
 import pandas as pd
-import time
 
 # --- CONFIGURATION ---
 try:
@@ -12,19 +11,17 @@ except:
     st.error("⚠️ API Key not found. Please set it in Streamlit Secrets.")
     st.stop()
 
-# BACKUP MODEL LIST
-# The app will try these one by one until it finds one that works.
-MODELS_TO_TRY = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
+# We stick to the standard model that works everywhere
+MODEL_NAME = "gemini-1.5-flash"
 
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
 # --- SETUP PAGE ---
-st.set_page_config(page_title="Gemini 3.3 English", layout="wide")
-st.title("🛡️ Gemini 3.3 TradeStation")
+st.set_page_config(page_title="Gemini 3.4 Stable", layout="wide")
+st.title("✅ Gemini 3.4 Stable TradeStation")
 
 # --- FUNCTIONS ---
 def get_safe_data(ticker):
-    """Fetches data safely."""
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(period="1d")
@@ -34,30 +31,19 @@ def get_safe_data(ticker):
         return f"{ticker}: Data Unavailable"
 
 def get_chart_data(ticker):
-    """Fetches 1-month history for the chart."""
     stock = yf.Ticker(ticker)
     hist = stock.history(period="1mo")
     return hist
 
 def get_gemini_response(prompt):
-    """Smart function that tries multiple models if one fails."""
     genai.configure(api_key=API_KEY)
-    
-    last_error = ""
-    # Try each model in the list
-    for model_name in MODELS_TO_TRY:
-        try:
-            model = genai.GenerativeModel(model_name)
-            return model.generate_content(prompt).text
-        except Exception as e:
-            # If it fails, save the error and try the next one
-            last_error = str(e)
-            continue
-            
-    # If ALL models fail:
-    return f"AI Error: Could not connect to any model. Please update requirements.txt. Last error: {last_error}"
+    try:
+        model = genai.GenerativeModel(MODEL_NAME)
+        return model.generate_content(prompt).text
+    except Exception as e:
+        return f"AI Error: {str(e)}"
 
-# --- SECTION 1: MARKET SCANNER ---
+# --- DASHBOARD ---
 st.header("1. 📡 Live Market Scanner")
 
 if st.button("🔄 Scan Markets Now", type="primary"):
@@ -71,111 +57,42 @@ if st.button("🔄 Scan Markets Now", type="primary"):
         
         st.session_state['market_data'] = market_data
         
-        prompt = f"""
-        Act as a Wall Street Analyst. Data: {market_data}
-        1. Give a 1-sentence mood summary.
-        2. Who is the winner today?
-        """
+        prompt = f"Analyze this market data in 2 sentences: {market_data}"
         st.success("Scan Complete")
         st.markdown(get_gemini_response(prompt))
 
-# --- SECTION 2: INTERACTIVE CHARTS ---
+# --- CHARTS ---
 st.divider()
-st.header("2. 📊 Interactive Price Charts")
-
-selected_ticker = st.selectbox("Select a Stock to View Chart:", WATCHLIST)
-
+st.header("2. 📊 Charts")
+selected_ticker = st.selectbox("Select Stock:", WATCHLIST)
 if selected_ticker:
-    try:
-        chart_data = get_chart_data(selected_ticker)
-        fig = px.line(chart_data, y='Close', title=f"{selected_ticker} - 30 Day Price Trend")
-        fig.update_layout(xaxis_title="Date", yaxis_title="Price ($)")
-        st.plotly_chart(fig, use_container_width=True)
-    except Exception as e:
-        st.error(f"Could not load chart: {e}")
+    st.plotly_chart(px.line(get_chart_data(selected_ticker), y='Close', title=f"{selected_ticker} Price"), use_container_width=True)
 
-# --- SECTION 3: CHAT ANALYST ---
+# --- CHAT ---
 st.divider()
 st.header("3. 💬 Ask the Analyst")
-
-col_chat1, col_chat2 = st.columns([3, 1])
-
-with col_chat1:
-    user_question = st.text_area("Question:", height=100, placeholder="E.g., What is the outlook for Tech?")
-
-with col_chat2:
-    st.write("Response Style:")
-    response_style = st.radio("Style", ["Short & Direct", "Detailed Analysis"])
+user_question = st.text_area("Question:", placeholder="Should I buy or sell?")
 
 if st.button("Run Analysis"):
-    if 'market_data' in st.session_state:
-        context = st.session_state['market_data']
-    else:
-        context = "No live data scanned yet."
-
-    if response_style == "Short & Direct":
-        style = "Keep it under 50 words. Be blunt."
-    else:
-        style = "Give a deep, professional breakdown."
-
-    full_prompt = f"""
-    ROLE: Hedge Fund Manager.
-    CONTEXT: {context}
-    USER: {user_question}
-    STYLE: {style}
-    """
-    
+    context = st.session_state.get('market_data', 'No data yet.')
+    prompt = f"Role: Financial Analyst. Context: {context}. User Question: {user_question}. Answer:"
     with st.spinner("Thinking..."):
-        st.markdown(get_gemini_response(full_prompt))
+        st.markdown(get_gemini_response(prompt))
 
-# --- SECTION 4: PORTFOLIO BUILDER ---
+# --- PORTFOLIO ---
 st.divider()
-st.header("4. 💰 Strategy Builder")
-st.error("⚠️ DISCLAIMER: This is for educational purposes only. NOT financial advice.")
+st.header("4. 💰 Strategy")
+investment = st.number_input("Investment ($)", value=1000)
+risk = st.radio("Risk", ["Low", "High"])
 
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    investment = st.number_input("Investment Amount ($)", min_value=100, value=1000, step=100)
-    risk_level = st.radio("Select Risk Tolerance", 
-                          ["Very Low", "Low", "Moderate", "High", "Very High"])
+if st.button("Generate Strategy"):
+    allocations = {"Stocks": 60, "Bonds": 40} if risk == "Low" else {"Crypto": 50, "Stocks": 50}
     
-    generate_btn = st.button("Generate Strategy")
-
-risk_map = {
-    "Very Low": {"Bonds": 70, "Cash": 20, "Index Funds": 10, "Stocks": 0, "Crypto": 0},
-    "Low": {"Bonds": 50, "Index Funds": 30, "Cash": 10, "Stocks": 10, "Crypto": 0},
-    "Moderate": {"Index Funds": 40, "Stocks": 30, "Bonds": 20, "Crypto": 5, "Cash": 5},
-    "High": {"Stocks": 50, "Crypto": 30, "Index Funds": 10, "Bonds": 0, "Tech ETFs": 10},
-    "Very High": {"Crypto": 60, "Tech Options": 20, "Stocks": 20, "Bonds": 0, "Cash": 0}
-}
-
-with col2:
-    if generate_btn:
-        # 1. Draw Pie Chart
-        allocations = risk_map[risk_level]
-        df = pd.DataFrame(list(allocations.items()), columns=['Asset', 'Percentage'])
-        df = df[df['Percentage'] > 0]
-        
-        fig = px.pie(df, values='Percentage', names='Asset', 
-                     title=f"Recommended Allocation for ${investment:,.0f}",
-                     color_discrete_sequence=px.colors.sequential.RdBu)
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # 2. Get AI Advice
-        st.subheader("📋 Detailed Buying Guide")
-        
-        ai_prompt = f"""
-        Act as a professional financial advisor. 
-        User has ${investment} and a '{risk_level}' risk tolerance.
-        The recommended allocation is: {allocations}.
-        
-        Task:
-        1. Break down exactly how much money to put in each category.
-        2. Recommend SPECIFIC tickers/assets for 2026.
-        3. Explain the risk warning.
-        """
-        
-        with st.spinner("Calculating optimal assets..."):
-            advice = get_gemini_response(ai_prompt)
-            st.markdown(advice)
+    # Chart
+    df = pd.DataFrame(list(allocations.items()), columns=['Asset', 'Percentage'])
+    st.plotly_chart(px.pie(df, values='Percentage', names='Asset'), use_container_width=True)
+    
+    # Text Advice
+    prompt = f"Advise on investing ${investment} with {risk} risk. Allocation: {allocations}. Be brief."
+    with st.spinner("Calculating..."):
+        st.markdown(get_gemini_response(prompt))
