@@ -16,51 +16,61 @@ except:
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
 # --- SETUP PAGE ---
-st.set_page_config(page_title="Gemini 5.1 Rotator", layout="wide")
-st.title("🚀 Gemini 5.1 TradeStation (Quota Safe Mode)")
+st.set_page_config(page_title="Gemini 5.2 Lite", layout="wide")
+st.title("🚀 Gemini 5.2 TradeStation (Lite Mode)")
 
 # --- FUNCTIONS ---
 
 def get_gemini_response(prompt):
     """
-    THE ROTATOR:
-    Tries multiple models in order. 
-    If one gives '429 Quota Exceeded' or '404 Not Found', it moves to the next.
+    VERSION 5.2: The 'Lite' Rotator
+    Prioritizes the '8b' model which is lightweight and less likely to hit quotas.
+    Adds a sleep timer to avoid spamming the API.
     """
-    # Priority list: Newest -> Fastest -> Oldest (Reliable)
+    # 1. Flash-8b (Lightweight, separate quota)
+    # 2. Flash (Standard)
+    # 3. Flash-Exp (Experimental, usually free)
     models_to_try = [
-        "gemini-2.0-flash-exp", 
+        "gemini-1.5-flash-8b", 
         "gemini-1.5-flash", 
-        "gemini-1.5-flash-8b",
-        "gemini-1.5-pro",
-        "gemini-1.0-pro"
+        "gemini-2.0-flash-exp"
     ]
     
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
     last_error = ""
+    status_placeholder = st.empty() # Show the user what is happening
     
     for model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={API_KEY}"
+        
+        # Show which model we are trying
+        status_placeholder.caption(f"🔄 Trying AI Model: {model}...")
+        
         try:
-            # Send Request
             response = requests.post(url, headers=headers, data=json.dumps(data))
             
-            # 200 = Success
             if response.status_code == 200:
+                status_placeholder.empty() # Clear the status message
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
             
-            # If 429 (Quota Full) or 404 (Not Found), we just continue to the next model
+            elif response.status_code == 429:
+                last_error = "Quota Exceeded (429)"
+                time.sleep(2) # Wait 2 seconds before retrying so we don't get banned
+                continue
+            
             else:
-                last_error = f"Model {model} Error: {response.status_code}"
-                continue 
+                last_error = f"Error {response.status_code}"
+                continue
                 
         except Exception as e:
             last_error = str(e)
+            time.sleep(1)
             continue
             
-    return f"AI System Overload: All models are busy or quota exceeded. Please wait 1 minute. ({last_error})"
+    status_placeholder.error("All models busy.")
+    return f"⚠️ System Cooldown: Please wait 60 seconds. Google says: {last_error}"
 
 def get_safe_data(ticker):
     try:
@@ -154,5 +164,5 @@ with col2:
         
         st.subheader("📋 Detailed Buying Guide")
         ai_prompt = f"Advisor role. Budget: ${investment}. Risk: {risk_level}. Allocation: {allocations}. Give specific ticker recommendations."
-        with st.spinner("Finding a free AI model..."):
+        with st.spinner("Calculating..."):
             st.markdown(get_gemini_response(ai_prompt))
