@@ -12,15 +12,15 @@ except:
     st.error("⚠️ API Key not found. Please set it in Streamlit Secrets.")
     st.stop()
 
-# LISTE OVER MODELLER (Backup system)
-# Den prøver dem en efter en, indtil en virker.
-MODELS_TO_TRY = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-001", "gemini-pro"]
+# BACKUP MODEL LIST
+# The app will try these one by one until it finds one that works.
+MODELS_TO_TRY = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
 
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
 # --- SETUP PAGE ---
-st.set_page_config(page_title="Gemini 3.2 Bulletproof", layout="wide")
-st.title("🛡️ Gemini 3.2 Bulletproof TradeStation")
+st.set_page_config(page_title="Gemini 3.3 English", layout="wide")
+st.title("🛡️ Gemini 3.3 TradeStation")
 
 # --- FUNCTIONS ---
 def get_safe_data(ticker):
@@ -44,17 +44,18 @@ def get_gemini_response(prompt):
     genai.configure(api_key=API_KEY)
     
     last_error = ""
+    # Try each model in the list
     for model_name in MODELS_TO_TRY:
         try:
             model = genai.GenerativeModel(model_name)
             return model.generate_content(prompt).text
         except Exception as e:
-            # Hvis den fejler, gem fejlen og prøv næste model i listen
+            # If it fails, save the error and try the next one
             last_error = str(e)
             continue
             
-    # Hvis ALLE modeller fejler:
-    return f"AI Error: Kunne ikke forbinde til nogen modeller. Sidste fejl: {last_error}"
+    # If ALL models fail:
+    return f"AI Error: Could not connect to any model. Please update requirements.txt. Last error: {last_error}"
 
 # --- SECTION 1: MARKET SCANNER ---
 st.header("1. 📡 Live Market Scanner")
