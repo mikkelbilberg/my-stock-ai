@@ -116,7 +116,7 @@ if st.button("Run Analysis"):
     with st.spinner("Thinking..."):
         st.markdown(get_gemini_response(full_prompt))
 
-# --- SECTION 4: PORTFOLIO BUILDER (RESTORED!) ---
+# --- SECTION 4: PORTFOLIO BUILDER ---
 st.divider()
 st.header("4. 💰 Strategy Builder")
 st.error("⚠️ DISCLAIMER: This is for educational purposes only. NOT financial advice.")
@@ -139,3 +139,31 @@ risk_map = {
 }
 
 with col2:
+    if generate_btn:
+        # 1. Draw Pie Chart
+        allocations = risk_map[risk_level]
+        df = pd.DataFrame(list(allocations.items()), columns=['Asset', 'Percentage'])
+        df = df[df['Percentage'] > 0]
+        
+        fig = px.pie(df, values='Percentage', names='Asset', 
+                     title=f"Recommended Allocation for ${investment:,.0f}",
+                     color_discrete_sequence=px.colors.sequential.RdBu)
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # 2. Get AI Advice
+        st.subheader("📋 Detailed Buying Guide")
+        
+        ai_prompt = f"""
+        Act as a professional financial advisor. 
+        User has ${investment} and a '{risk_level}' risk tolerance.
+        The recommended allocation is: {allocations}.
+        
+        Task:
+        1. Break down exactly how much money to put in each category.
+        2. Recommend SPECIFIC tickers/assets for 2026.
+        3. Explain the risk warning.
+        """
+        
+        with st.spinner("Calculating optimal assets..."):
+            advice = get_gemini_response(ai_prompt)
+            st.markdown(advice)
