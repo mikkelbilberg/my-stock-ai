@@ -1,6 +1,6 @@
 import streamlit as st
 import yfinance as yf
-import requests # <--- New way: We talk directly to the web
+import requests # Direct web connection
 import json
 import plotly.express as px
 import pandas as pd
@@ -15,8 +15,8 @@ except:
 WATCHLIST = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "BTC-USD", "ETH-USD"]
 
 # --- SETUP PAGE ---
-st.set_page_config(page_title="Gemini 4.0 Manual Mode", layout="wide")
-st.title("🚀 Gemini 4.0 TradeStation (Direct Link)")
+st.set_page_config(page_title="Gemini 4.1 EU Safe", layout="wide")
+st.title("🚀 Gemini 4.1 TradeStation (EU Safe Mode)")
 
 # --- FUNCTIONS ---
 def get_safe_data(ticker):
@@ -37,33 +37,42 @@ def get_chart_data(ticker):
 
 def get_gemini_response(prompt):
     """
-    NEW METHOD: DIRECT HTTP REQUEST
-    This bypasses the 'google-generativeai' library completely.
-    It manually sends the data to Google's API URL.
+    MANUAL MODE WITH FALLBACK
+    1. Tries the new Flash model (Fastest).
+    2. If that fails (Error 404 in EU), switches to Standard Pro model.
     """
-    # 1. The Direct URL (Using gemini-1.5-flash)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
-    
-    # 2. The Data Package
     headers = {'Content-Type': 'application/json'}
-    data = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+    data = {"contents": [{"parts": [{"text": prompt}]}]}
     
-    # 3. Send the Signal
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(data))
+    # LIST OF MODELS TO TRY
+    # We try them in order. If one works, we return the answer.
+    models = [
+        "gemini-1.5-flash", 
+        "gemini-pro",        # <--- The "Old Faithful" that works everywhere
+        "gemini-1.0-pro"
+    ]
+    
+    last_error = ""
+    
+    for model_name in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
         
-        # Check if it worked (Code 200 = OK)
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"Error {response.status_code}: {response.text}"
+        try:
+            response = requests.post(url, headers=headers, data=json.dumps(data))
             
-    except Exception as e:
-        return f"Connection Error: {str(e)}"
+            if response.status_code == 200:
+                # Success! Return the answer immediately.
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            else:
+                # If failed, save error and loop to the next model
+                last_error = f"Model {model_name} failed: {response.text}"
+                continue
+                
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    return f"AI Error: All models failed. Your API Key might be invalid or region-blocked. Last Error: {last_error}"
 
 # --- SECTION 1: MARKET SCANNER ---
 st.header("1. 📡 Live Market Scanner")
@@ -170,7 +179,7 @@ with col2:
                      color_discrete_sequence=px.colors.sequential.RdBu)
         st.plotly_chart(fig, use_container_width=True)
         
-        # 2. Get AI Advice (Using Direct Link)
+        # 2. Get AI Advice
         st.subheader("📋 Detailed Buying Guide")
         
         ai_prompt = f"""
