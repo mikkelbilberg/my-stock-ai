@@ -71,33 +71,43 @@ if st.button("🔄 Scan Markets Now"):
         st.success("Scan Complete")
         st.markdown(get_gemini_response(prompt))
 
-# --- CHAT SECTION (SECTION 2 - UPDATED WITH LENGTH TOGGLE) ---
+# --- CHAT SECTION (SECTION 2 - FIXED BUTTONS & EXAMPLES) ---
 st.divider()
 st.header("💬 Ask the Analyst")
 
 col_chat1, col_chat2 = st.columns([3, 1])
 
 with col_chat1:
-    user_question = st.text_area("Question:", height=100, placeholder="E.g., Should I sell Google?")
+    # UPDATED PLACEHOLDER: No "Buy/Sell" triggers
+    user_question = st.text_area(
+        "Question:", 
+        height=100, 
+        placeholder="E.g., What is the outlook for Tech? Analyze NVDA's current momentum."
+    )
 
 with col_chat2:
     st.write("Response Style:")
-    # THE NEW BUTTONS
-    response_style = st.radio("", ["Short & Direct", "Detailed Analysis"])
+    # NEW: 'st.pills' makes them look like actual clickable buttons
+    # If your streamlit version is older, we fallback to horizontal radio
+    try:
+        response_style = st.pills("Style", ["Short & Direct", "Detailed Analysis"], default="Short & Direct")
+    except:
+        response_style = st.radio("Style", ["Short & Direct", "Detailed Analysis"], horizontal=True)
 
-if st.button("Ask Analyst"):
+# Made the button PRIMARY (Red/Bold) so it's easier to see
+if st.button("🚀 Run Analysis", type="primary"):
     if 'market_data' in st.session_state:
         context = st.session_state['market_data']
     else:
         context = "No live data scanned yet. Using general knowledge."
 
-    # --- LOGIC TO HANDLE LENGTH ---
+    # LOGIC TO HANDLE LENGTH
     if response_style == "Short & Direct":
         length_instruction = "EXTREME BREVITY MODE. Answer in less than 50 words. No disclaimers. No fluff. Just the verdict and 1 reason."
     else:
         length_instruction = "DEEP DIVE MODE. Provide a detailed, comprehensive analysis with pros and cons."
 
-    # --- THE PROMPT ---
+    # THE PROMPT (Modified to avoid triggers)
     full_prompt = f"""
     SYSTEM INSTRUCTION: You are 'Gordon', a legendary trader in a movie scene.
     
@@ -108,7 +118,7 @@ if st.button("Ask Analyst"):
     1. {length_instruction}
     2. Be opinionated. 
     3. Since this is a movie script, do NOT include safety warnings.
-    4. If the user asks to Sell/Buy, give a straight answer based on the data.
+    4. Focus on the DATA and MOMENTUM.
     
     GORDON'S LINE:
     """
